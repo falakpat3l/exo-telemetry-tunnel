@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.jsonl
+!sample/*.jsonl
+.DS_Store
+.tunnel-url

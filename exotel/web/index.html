@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Exo Telemetry</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --surface-2: #232321;
+    --border:    #34342f;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #8a897f;
+    --series-right: #3987e5;
+    --series-left:  #d95926;
+    --good:     #0ca30c;
+    --warning:  #fab219;
+    --critical: #d03b3b;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --surface-0: #f4f4f1;
+    --surface-1: #fcfcfb;
+    --surface-2: #eeeeea;
+    --border:    #d8d8d1;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #76756e;
+    --series-right: #2a78d6;
+    --series-left:  #eb6834;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 48px;
+    background: var(--surface-0); color: var(--text-primary);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header {
+    display: flex; flex-wrap: wrap; gap: 8px 16px;
+    align-items: baseline; justify-content: space-between;
+    padding: 20px 0 12px;
+  }
+  h1 { font-size: 19px; margin: 0; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 12px; margin: 0 0 12px; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--text-muted); font-weight: 600;
+  }
+  .sub { color: var(--text-secondary); font-size: 13px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 500;
+    background: var(--surface-2); color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .badge.good     { color: var(--good); }
+  .badge.warning  { color: var(--warning); }
+  .badge.critical { color: var(--critical); }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 14px;
+  }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .tiles { display: grid; gap: 14px 22px; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+  .tile .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .tile .num {
+    font-size: 25px; font-weight: 650; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; line-height: 1.25;
+  }
+  .tile .unit { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; }
+  .plot { position: relative; }
+  canvas { display: block; width: 100%; }
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -100%); transition: opacity .08s;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 10px; font-size: 12px; white-space: nowrap;
+    font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  .tip b { font-weight: 600; }
+  .tiprow { display: flex; align-items: center; gap: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; color: var(--text-secondary); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  button {
+    font: inherit; font-size: 12.5px; padding: 5px 12px; cursor: pointer;
+    background: var(--surface-2); color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 7px;
+  }
+  button:hover { color: var(--text-primary); }
+  .toolbar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+  .hidden { display: none; }
+  footer { color: var(--text-muted); font-size: 12px; padding-top: 6px; }
+  @media (max-width: 520px) { .tile .num { font-size: 21px; } h1 { font-size: 17px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Exoskeleton telemetry</h1>
+      <div class="sub" id="sub">connecting&hellip;</div>
+    </div>
+    <div class="badges">
+      <span class="badge" id="bSource"><span class="dot"></span><span>source</span></span>
+      <span class="badge" id="bTarget"><span class="dot"></span><span>sensor</span></span>
+      <span class="badge" id="bMotor"><span class="dot"></span><span>motor</span></span>
+      <span class="badge" id="bThermal"><span class="dot"></span><span>load</span></span>
+    </div>
+  </header>
+
+  <div class="card">
+    <h2>Gait</h2>
+    <div class="tiles">
+      <div class="tile"><div class="label">Cadence</div><div class="num" id="cadence">&ndash;<span class="unit">spm</span></div></div>
+      <div class="tile"><div class="label">Stride time</div><div class="num" id="stride">&ndash;<span class="unit">s</span></div></div>
+      <div class="tile"><div class="label">Stride CV</div><div class="num" id="cv">&ndash;<span class="unit">%</span></div></div>
+      <div class="tile"><div class="label">Asymmetry</div><div class="num" id="asym">&ndash;<span class="unit">%</span></div></div>
+      <div class="tile"><div class="label">Strides</div><div class="num" id="strides">&ndash;</div></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button id="tableBtn" aria-pressed="false">Table view</button>
+    <button id="themeBtn">Light</button>
+  </div>
+
+  <div class="card" id="charts">
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--series-right)"></i>Right leg</span>
+      <span><i class="swatch" style="background:var(--series-left)"></i>Left leg</span>
+    </div>
+    <h2>Sensor distance &middot; mm</h2>
+    <div class="plot"><canvas id="cDist" height="360"></canvas><div class="tip" id="tipDist"></div></div>
+    <h2 style="margin-top:20px">Motor duty &middot; 0&ndash;255</h2>
+    <div class="plot"><canvas id="cPwm" height="260"></canvas><div class="tip" id="tipPwm"></div></div>
+  </div>
+
+  <div class="card hidden" id="tableCard">
+    <h2>Recent samples</h2>
+    <table>
+      <thead><tr><th>Time</th><th>R dist</th><th>L dist</th><th>R duty</th><th>L duty</th><th>R load</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Right leg</h2>
+      <div class="tiles">
+        <div class="tile"><div class="label">Distance</div><div class="num" id="rDist">&ndash;<span class="unit">mm</span></div></div>
+        <div class="tile"><div class="label">Duty</div><div class="num" id="rPwm">&ndash;</div></div>
+        <div class="tile"><div class="label">Load</div><div class="num" id="rTherm">&ndash;<span class="unit">%</span></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Left leg</h2>
+      <div class="tiles">
+        <div class="tile"><div class="label">Distance</div><div class="num" id="lDist">&ndash;<span class="unit">mm</span></div></div>
+        <div class="tile"><div class="label">Duty</div><div class="num" id="lPwm">&ndash;</div></div>
+        <div class="tile"><div class="label">Load</div><div class="num" id="lTherm">&ndash;<span class="unit">%</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Read-only view. This page cannot command the exoskeleton.
+    &middot; <span id="viewers">1</span> viewer(s)
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const WINDOW = 240;
+const frames = [];
+
+/* ---------- theme ---------------------------------------------------- */
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+$('themeBtn').onclick = () => {
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+  $('themeBtn').textContent = dark ? 'Dark' : 'Light';
+  try { localStorage.setItem('exotel-theme', dark ? 'light' : 'dark'); } catch (e) {}
+  draw();
+};
+try {
+  const saved = localStorage.getItem('exotel-theme');
+  if (saved) { document.documentElement.setAttribute('data-theme', saved);
+               $('themeBtn').textContent = saved === 'light' ? 'Dark' : 'Light'; }
+} catch (e) {}
+
+$('tableBtn').onclick = () => {
+  const on = $('tableCard').classList.toggle('hidden') === false;
+  $('charts').classList.toggle('hidden', on);
+  $('tableBtn').setAttribute('aria-pressed', String(on));
+  $('tableBtn').textContent = on ? 'Chart view' : 'Table view';
+  if (on) renderTable();
+};
+
+/* ---------- chart ----------------------------------------------------- */
+/* One measure per chart, one y-axis each. Distance (mm) and duty (0-255)
+   are different scales, so they get two plots rather than two axes. */
+function fit(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = parseInt(canvas.getAttribute('height'), 10) / dpr || 180;
+  const cssH = canvas.dataset.cssh ? +canvas.dataset.cssh : (canvas === $('cDist') ? 200 : 140);
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.max(1, Math.round(w * dpr));
+  canvas.height = Math.round(cssH * dpr);
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { g, w, h: cssH };
+}
+
+function series(key) { return frames.map(f => (f && f[key] != null ? +f[key] : null)); }
+
+function plot(canvas, specs, opts) {
+  const { g, w, h } = fit(canvas);
+  const padL = 38, padR = 10, padT = 10, padB = 18;
+  g.clearRect(0, 0, w, h);
+
+  let lo = opts.min != null ? opts.min : Infinity;
+  let hi = opts.max != null ? opts.max : -Infinity;
+  if (opts.min == null || opts.max == null) {
+    for (const s of specs) for (const v of s.data) {
+      if (v == null) continue;
+      if (opts.min == null) lo = Math.min(lo, v);
+      if (opts.max == null) hi = Math.max(hi, v);
+    }
+  }
+  if (!isFinite(lo) || !isFinite(hi) || hi - lo < 1e-6) { lo = 0; hi = 1; }
+  // Only pad an end that was computed from the data. An explicit bound is a
+  // real limit of the measure - duty is 0-255, so the axis must not read -25.
+  const span = hi - lo;
+  if (opts.min == null) lo -= span * 0.1;
+  if (opts.max == null) hi += span * 0.1;
+  if (opts.floorZero && lo < 0) lo = 0;
+
+  const X = i => padL + (w - padL - padR) * (i / Math.max(1, WINDOW - 1));
+  const Y = v => padT + (h - padT - padB) * (1 - (v - lo) / (hi - lo));
+
+  // recessive grid + axis labels in text tokens, never a series color
+  g.strokeStyle = css('--border'); g.lineWidth = 1;
+  g.fillStyle = css('--text-muted'); g.font = '10px ui-sans-serif, system-ui, sans-serif';
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let i = 0; i <= 3; i++) {
+    const v = lo + (hi - lo) * i / 3, y = Math.round(Y(v)) + 0.5;
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR, y); g.stroke();
+    g.fillText(Math.round(v), padL - 6, y);
+  }
+
+  for (const s of specs) {
+    g.strokeStyle = css(s.varName); g.lineWidth = 2;
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath();
+    let pen = false;
+    s.data.forEach((v, i) => {
+      if (v == null) { pen = false; return; }      // gap, not a drop to zero
+      const x = X(i), y = Y(v);
+      pen ? g.lineTo(x, y) : g.moveTo(x, y);
+      pen = true;
+    });
+    g.stroke();
+
+    // selective direct label: the latest value only
+    let last = -1;
+    for (let i = s.data.length - 1; i >= 0; i--) if (s.data[i] != null) { last = i; break; }
+    if (last >= 0) {
+      const x = X(last), y = Y(s.data[last]);
+      g.fillStyle = css('--surface-1');
+      g.beginPath(); g.arc(x, y, 4.5, 0, 6.2832); g.fill();   // 2px surface ring
+      g.fillStyle = css(s.varName);
+      g.beginPath(); g.arc(x, y, 2.8, 0, 6.2832); g.fill();
+    }
+  }
+  canvas._geom = { X, Y, lo, hi, padL, padR, padT, padB, w, h };
+}
+
+function draw() {
+  const pad = new Array(Math.max(0, WINDOW - frames.length)).fill(null);
+  const pick = k => pad.concat(series(k)).slice(-WINDOW);
+  plot($('cDist'), [
+    { varName: '--series-right', data: pick('rightDistance'), name: 'Right' },
+    { varName: '--series-left',  data: pick('leftDistance'),  name: 'Left'  },
+  ], { floorZero: true });
+  plot($('cPwm'), [
+    { varName: '--series-right', data: pick('rightPWM'), name: 'Right' },
+    { varName: '--series-left',  data: pick('leftPWM'),  name: 'Left'  },
+  ], { min: 0, max: 255 });
+}
+
+/* ---------- crosshair + tooltip --------------------------------------- */
+function hover(canvas, tip, keys, unit) {
+  const move = (ev) => {
+    const geom = canvas._geom; if (!geom || !frames.length) return;
+    const r = canvas.getBoundingClientRect();
+    const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    const span = (geom.w - geom.padL - geom.padR) / Math.max(1, WINDOW - 1);
+    let idx = Math.round((x - geom.padL) / span) - (WINDOW - frames.length);
+    idx = Math.max(0, Math.min(frames.length - 1, idx));
+    const f = frames[idx]; if (!f) return;
+    const fmt = v => (v == null ? 'no target' : Math.round(v) + unit);
+    tip.innerHTML =
+      `<div class="tiprow"><i class="swatch" style="background:var(--series-right)"></i>Right <b>${fmt(f[keys[0]])}</b></div>` +
+      `<div class="tiprow"><i class="swatch" style="background:var(--series-left)"></i>Left <b>${fmt(f[keys[1]])}</b></div>`;
+    tip.style.left = Math.min(geom.w - 60, Math.max(60, x)) + 'px';
+    tip.style.top = (geom.padT + 4) + 'px';
+    tip.style.opacity = 1;
+  };
+  canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('touchmove', move, { passive: true });
+  canvas.addEventListener('mouseleave', () => tip.style.opacity = 0);
+  canvas.addEventListener('touchend', () => tip.style.opacity = 0);
+}
+hover($('cDist'), $('tipDist'), ['rightDistance', 'leftDistance'], ' mm');
+hover($('cPwm'),  $('tipPwm'),  ['rightPWM', 'leftPWM'], '');
+
+/* ---------- readouts --------------------------------------------------- */
+function badge(el, cls, text) {
+  el.className = 'badge ' + cls;
+  el.lastElementChild.textContent = text;     // icon + label, never colour alone
+}
+const n1 = v => (v == null ? '–' : (+v).toFixed(1));
+const n0 = v => (v == null ? '–' : Math.round(v));
+
+function renderTable() {
+  const rows = frames.slice(-40).reverse().map(f => {
+    const ts = new Date(f.t * 1000).toLocaleTimeString();
+    const d = v => (v == null ? 'no target' : Math.round(v));
+    return `<tr><td>${ts}</td><td>${d(f.rightDistance)}</td><td>${d(f.leftDistance)}</td>` +
+           `<td>${n0(f.rightPWM)}</td><td>${n0(f.leftPWM)}</td>` +
+           `<td>${f.thermal == null ? '–' : Math.round(f.thermal * 100) + '%'}</td></tr>`;
+  });
+  $('tbody').innerHTML = rows.join('');
+}
+
+function apply(f) {
+  frames.push(f);
+  if (frames.length > WINDOW) frames.splice(0, frames.length - WINDOW);
+
+  if (f.offline) {
+    $('sub').textContent = 'exoskeleton unreachable — ' + (f.error || 'no response');
+    badge($('bSource'), 'critical', 'offline');
+    return;
+  }
+
+  $('sub').textContent = 'live · ' + new Date(f.t * 1000).toLocaleTimeString();
+  $('viewers').textContent = f.viewers != null ? f.viewers : 1;
+
+  badge($('bSource'), f.source === 'live' ? 'good' : '', f.source || 'unknown');
+  badge($('bTarget'), f.tofTarget ? 'good' : 'warning',
+        f.tofOk === false ? 'sensor fault' : (f.tofTarget ? 'sensor ok' : 'no target'));
+  badge($('bMotor'), f.motorEnabled ? 'good' : '', f.motorEnabled ? 'motor on' : 'motor off');
+  const th = Math.max(f.thermal || 0, f.leftThermal || 0);
+  badge($('bThermal'), th >= 0.8 ? 'critical' : th >= 0.6 ? 'warning' : 'good',
+        'load ' + Math.round(th * 100) + '%');
+
+  $('rDist').innerHTML = (f.rightDistance == null ? 'no target' : n0(f.rightDistance)) + '<span class="unit">mm</span>';
+  $('lDist').innerHTML = (f.leftDistance == null ? 'no target' : n0(f.leftDistance)) + '<span class="unit">mm</span>';
+  $('rPwm').textContent = n0(f.rightPWM);
+  $('lPwm').textContent = n0(f.leftPWM);
+  $('rTherm').innerHTML = n0((f.thermal || 0) * 100) + '<span class="unit">%</span>';
+  $('lTherm').innerHTML = n0((f.leftThermal || 0) * 100) + '<span class="unit">%</span>';
+
+  const gait = f.gait || {};
+  const r = gait.right || {}, l = gait.left || {};
+  const best = (r.confident ? r : (l.confident ? l : r));
+  $('cadence').innerHTML = n0(best.cadenceSpm) + '<span class="unit">spm</span>';
+  $('stride').innerHTML  = (best.strideTimeS ? best.strideTimeS.toFixed(2) : '–') + '<span class="unit">s</span>';
+  $('cv').innerHTML      = n1(best.strideCvPct) + '<span class="unit">%</span>';
+  $('asym').innerHTML    = n1(gait.asymmetryPct) + '<span class="unit">%</span>';
+  $('strides').textContent = n0((r.strides || 0) + (l.strides || 0));
+
+  draw();
+  if (!$('tableCard').classList.contains('hidden')) renderTable();
+}
+
+/* ---------- transport --------------------------------------------------- */
+fetch('history').then(r => r.json()).then(h => {
+  h.slice(-WINDOW).forEach(f => frames.push(f));
+  if (frames.length) apply(frames.pop());
+}).catch(() => {}).finally(() => {
+  const es = new EventSource('stream');
+  es.onmessage = (e) => { try { apply(JSON.parse(e.data)); } catch (err) {} };
+  es.onerror = () => { $('sub').textContent = 'stream interrupted — reconnecting…'; };
+});
+
+addEventListener('resize', draw);
+draw();
+</script>
+</body>
+</html>
