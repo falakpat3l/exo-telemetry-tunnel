@@ -33,8 +33,10 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-LOG="$(mktemp -t exotel-server)"
-TLOG="$(mktemp -t exotel-tunnel)"
+# An explicit XXXXXX template works with both GNU (Linux) and BSD (macOS)
+# mktemp; `mktemp -t name` without X's fails on Linux.
+LOG="$(mktemp "${TMPDIR:-/tmp}/exotel-server.XXXXXX")"
+TLOG="$(mktemp "${TMPDIR:-/tmp}/exotel-tunnel.XXXXXX")"
 
 "$PY" -m exotel --port "$PORT" "$@" >"$LOG" 2>&1 &
 SERVER_PID=$!
