@@ -351,7 +351,7 @@ function apply(f) {
   if (frames.length > WINDOW) frames.splice(0, frames.length - WINDOW);
 
   if (f.offline) {
-    $('sub').textContent = 'exoskeleton unreachable — ' + (f.error || 'no response');
+    $('sub').textContent = 'exoskeleton unreachable: ' + (f.error || 'no response');
     badge($('bSource'), 'critical', 'offline');
     return;
   }
@@ -394,7 +394,7 @@ fetch('history').then(r => r.json()).then(h => {
 }).catch(() => {}).finally(() => {
   const es = new EventSource('stream');
   es.onmessage = (e) => { try { apply(JSON.parse(e.data)); } catch (err) {} };
-  es.onerror = () => { $('sub').textContent = 'stream interrupted — reconnecting…'; };
+  es.onerror = () => { $('sub').textContent = 'stream interrupted, reconnecting…'; };
 });
 
 addEventListener('resize', draw);
