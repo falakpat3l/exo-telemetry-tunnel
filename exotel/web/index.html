@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark light">
 <title>Exo Telemetry</title>
 <style>
   :root {
@@ -12,14 +13,16 @@
     --surface-1: #1a1a19;
     --surface-2: #232321;
     --border:    #34342f;
+    --grid:      #2a2a27;
     --text-primary:   #ffffff;
     --text-secondary: #c3c2b7;
     --text-muted:     #8a897f;
     --series-right: #3987e5;
     --series-left:  #d95926;
-    --good:     #0ca30c;
+    --good:     #22b14c;
     --warning:  #fab219;
-    --critical: #d03b3b;
+    --critical: #e5484d;
+    --focus:    #8ab4f8;
   }
   :root[data-theme="light"] {
     color-scheme: light;
@@ -27,11 +30,16 @@
     --surface-1: #fcfcfb;
     --surface-2: #eeeeea;
     --border:    #d8d8d1;
+    --grid:      #e6e6e0;
     --text-primary:   #0b0b0b;
     --text-secondary: #52514e;
-    --text-muted:     #76756e;
+    --text-muted:     #6e6d66;
     --series-right: #2a78d6;
     --series-left:  #eb6834;
+    --good:     #137a2f;
+    --warning:  #9a6200;
+    --critical: #c4252b;
+    --focus:    #2a78d6;
   }
   * { box-sizing: border-box; }
   body {
@@ -42,44 +50,79 @@
   }
   .wrap { max-width: 980px; margin: 0 auto; }
   header {
-    display: flex; flex-wrap: wrap; gap: 8px 16px;
-    align-items: baseline; justify-content: space-between;
-    padding: 20px 0 12px;
+    display: flex; flex-wrap: wrap; gap: 10px 16px;
+    align-items: center; justify-content: space-between;
+    padding: 20px 0 14px;
   }
   h1 { font-size: 19px; margin: 0; letter-spacing: -0.01em; }
   h2 {
     font-size: 12px; margin: 0 0 12px; text-transform: uppercase;
     letter-spacing: 0.07em; color: var(--text-muted); font-weight: 600;
   }
-  .sub { color: var(--text-secondary); font-size: 13px; }
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; transition: opacity .2s; }
+  .badges.stale { opacity: .45; }
   .badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500;
     background: var(--surface-2); color: var(--text-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border); white-space: nowrap;
   }
-  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
   .badge.good     { color: var(--good); }
   .badge.warning  { color: var(--warning); }
   .badge.critical { color: var(--critical); }
+
+  /* Connection status: the one indicator that answers "is this live?" */
+  .status {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; margin-bottom: 14px; border-radius: 12px;
+    background: var(--surface-1); border: 1px solid var(--border);
+    font-size: 13.5px; color: var(--text-secondary);
+  }
+  .status b { color: var(--text-primary); font-weight: 600; }
+  .status .light {
+    width: 10px; height: 10px; border-radius: 50%; flex: none;
+    background: var(--text-muted); position: relative;
+  }
+  .status.good .light { background: var(--good); }
+  .status.good .light::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%;
+    border: 2px solid var(--good); opacity: 0; animation: ping 2s ease-out infinite;
+  }
+  .status.warning  { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
+  .status.warning .light  { background: var(--warning); }
+  .status.critical { border-color: color-mix(in srgb, var(--critical) 55%, var(--border)); }
+  .status.critical .light { background: var(--critical); }
+  .status .grow { flex: 1; min-width: 0; }
+  .status button { flex: none; }
+  @keyframes ping { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(1.4); opacity: 0; } }
+
   .card {
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: 12px; padding: 16px; margin-bottom: 14px;
   }
-  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .grid .card { margin-bottom: 0; }
+  .grid .tiles { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
   .tiles { display: grid; gap: 14px 22px; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
   .tile .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
   .tile .num {
     font-size: 25px; font-weight: 650; letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums; line-height: 1.25;
   }
-  .tile .unit { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
-  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px; }
+  .tile .num.na { color: var(--text-muted); font-weight: 500; }
+  .tile .num .small { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+  .tile .unit { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 3px; letter-spacing: 0; }
+  .hint { font-size: 12.5px; color: var(--text-muted); margin: 12px 0 0; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .swatch { width: 10px; height: 10px; border-radius: 2px; }
-  .plot { position: relative; }
-  canvas { display: block; width: 100%; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+  .chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; margin-bottom: 6px; }
+  .chart-head h2 { margin: 0; }
+  .plot { position: relative; margin-bottom: 18px; }
+  .plot:last-child { margin-bottom: 0; }
+  canvas { display: block; width: 100%; touch-action: pan-y; }
   .tip {
     position: absolute; pointer-events: none; opacity: 0;
     transform: translate(-50%, -100%); transition: opacity .08s;
@@ -88,21 +131,36 @@
     font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgba(0,0,0,.35);
   }
   .tip b { font-weight: 600; }
+  .tip .when { color: var(--text-muted); margin-bottom: 3px; }
   .tiprow { display: flex; align-items: center; gap: 6px; }
+  .table-scroll { overflow-x: auto; margin: 0 -4px; }
   table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; color: var(--text-secondary); }
   th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td.na { color: var(--text-muted); }
+  tbody tr:last-child td { border-bottom: 0; }
   button {
-    font: inherit; font-size: 12.5px; padding: 5px 12px; cursor: pointer;
+    font: inherit; font-size: 12.5px; padding: 6px 14px; cursor: pointer;
     background: var(--surface-2); color: var(--text-secondary);
-    border: 1px solid var(--border); border-radius: 7px;
+    border: 1px solid var(--border); border-radius: 999px;
+    transition: color .15s, border-color .15s;
   }
-  button:hover { color: var(--text-primary); }
+  button:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .toolbar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
-  .hidden { display: none; }
-  footer { color: var(--text-muted); font-size: 12px; padding-top: 6px; }
-  @media (max-width: 520px) { .tile .num { font-size: 21px; } h1 { font-size: 17px; } }
+  .hidden { display: none !important; }
+  footer { color: var(--text-muted); font-size: 12px; padding-top: 16px; }
+  @media (max-width: 520px) {
+    .tile .num { font-size: 22px; }
+    h1 { font-size: 17px; }
+    .card { padding: 14px; }
+    .toolbar { justify-content: stretch; }
+    .toolbar button { flex: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -111,73 +169,85 @@
   <header>
     <div>
       <h1>Exoskeleton telemetry</h1>
-      <div class="sub" id="sub">connecting&hellip;</div>
+      <div class="sub" id="sub">Connecting&hellip;</div>
     </div>
-    <div class="badges">
-      <span class="badge" id="bSource"><span class="dot"></span><span>source</span></span>
+    <div class="badges" id="badges">
       <span class="badge" id="bTarget"><span class="dot"></span><span>sensor</span></span>
       <span class="badge" id="bMotor"><span class="dot"></span><span>motor</span></span>
       <span class="badge" id="bThermal"><span class="dot"></span><span>load</span></span>
     </div>
   </header>
 
+  <div class="status warning" id="status" role="status" aria-live="polite">
+    <span class="light" aria-hidden="true"></span>
+    <span class="grow"><b id="stTitle">Connecting</b> <span id="stText">Waiting for the first sample.</span></span>
+    <button id="retryBtn" class="hidden">Try again</button>
+  </div>
+
   <div class="card">
     <h2>Gait</h2>
     <div class="tiles">
-      <div class="tile"><div class="label">Cadence</div><div class="num" id="cadence">&ndash;<span class="unit">spm</span></div></div>
-      <div class="tile"><div class="label">Stride time</div><div class="num" id="stride">&ndash;<span class="unit">s</span></div></div>
-      <div class="tile"><div class="label">Stride CV</div><div class="num" id="cv">&ndash;<span class="unit">%</span></div></div>
-      <div class="tile"><div class="label">Asymmetry</div><div class="num" id="asym">&ndash;<span class="unit">%</span></div></div>
-      <div class="tile"><div class="label">Strides</div><div class="num" id="strides">&ndash;</div></div>
+      <div class="tile"><div class="label">Cadence</div><div class="num na" id="cadence">&ndash;<span class="unit">steps/min</span></div></div>
+      <div class="tile"><div class="label">Stride time</div><div class="num na" id="stride">&ndash;<span class="unit">s</span></div></div>
+      <div class="tile"><div class="label">Stride CV</div><div class="num na" id="cv">&ndash;<span class="unit">%</span></div></div>
+      <div class="tile"><div class="label">Asymmetry</div><div class="num na" id="asym">&ndash;<span class="unit">%</span></div></div>
+      <div class="tile"><div class="label">Strides R / L</div><div class="num na" id="strides">&ndash;</div></div>
     </div>
+    <p class="hint" id="gaitHint">Stride CV and asymmetry appear once each leg has 7 strides.</p>
   </div>
 
   <div class="toolbar">
     <button id="tableBtn" aria-pressed="false">Table view</button>
-    <button id="themeBtn">Light</button>
+    <button id="themeBtn">Light theme</button>
   </div>
 
   <div class="card" id="charts">
-    <div class="legend">
-      <span><i class="swatch" style="background:var(--series-right)"></i>Right leg</span>
-      <span><i class="swatch" style="background:var(--series-left)"></i>Left leg</span>
+    <div class="chart-head">
+      <h2>Sensor distance &middot; mm</h2>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--series-right)"></i>Right leg</span>
+        <span><i class="swatch" style="background:var(--series-left)"></i>Left leg</span>
+      </div>
     </div>
-    <h2>Sensor distance &middot; mm</h2>
-    <div class="plot"><canvas id="cDist" height="360"></canvas><div class="tip" id="tipDist"></div></div>
-    <h2 style="margin-top:20px">Motor duty &middot; 0&ndash;255</h2>
-    <div class="plot"><canvas id="cPwm" height="260"></canvas><div class="tip" id="tipPwm"></div></div>
+    <div class="plot"><canvas id="cDist" aria-label="Sensor distance over time, both legs" role="img"></canvas><div class="tip" id="tipDist"></div></div>
+    <div class="chart-head"><h2>Motor duty &middot; 0&ndash;255</h2></div>
+    <div class="plot"><canvas id="cPwm" aria-label="Motor duty over time, both legs" role="img"></canvas><div class="tip" id="tipPwm"></div></div>
   </div>
 
   <div class="card hidden" id="tableCard">
     <h2>Recent samples</h2>
-    <table>
-      <thead><tr><th>Time</th><th>R dist</th><th>L dist</th><th>R duty</th><th>L duty</th><th>R load</th></tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Time</th><th>R mm</th><th>L mm</th><th>R duty</th><th>L duty</th><th>R load</th><th>L load</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="na">No samples yet.</td></tr></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="grid">
     <div class="card">
       <h2>Right leg</h2>
       <div class="tiles">
-        <div class="tile"><div class="label">Distance</div><div class="num" id="rDist">&ndash;<span class="unit">mm</span></div></div>
-        <div class="tile"><div class="label">Duty</div><div class="num" id="rPwm">&ndash;</div></div>
-        <div class="tile"><div class="label">Load</div><div class="num" id="rTherm">&ndash;<span class="unit">%</span></div></div>
+        <div class="tile"><div class="label">Distance</div><div class="num na" id="rDist">&ndash;<span class="unit">mm</span></div></div>
+        <div class="tile"><div class="label">Swing</div><div class="num na" id="rExc">&ndash;<span class="unit">mm</span></div></div>
+        <div class="tile"><div class="label">Duty</div><div class="num na" id="rPwm">&ndash;<span class="unit">/255</span></div></div>
+        <div class="tile"><div class="label">Load</div><div class="num na" id="rTherm">&ndash;<span class="unit">%</span></div></div>
       </div>
     </div>
     <div class="card">
       <h2>Left leg</h2>
       <div class="tiles">
-        <div class="tile"><div class="label">Distance</div><div class="num" id="lDist">&ndash;<span class="unit">mm</span></div></div>
-        <div class="tile"><div class="label">Duty</div><div class="num" id="lPwm">&ndash;</div></div>
-        <div class="tile"><div class="label">Load</div><div class="num" id="lTherm">&ndash;<span class="unit">%</span></div></div>
+        <div class="tile"><div class="label">Distance</div><div class="num na" id="lDist">&ndash;<span class="unit">mm</span></div></div>
+        <div class="tile"><div class="label">Swing</div><div class="num na" id="lExc">&ndash;<span class="unit">mm</span></div></div>
+        <div class="tile"><div class="label">Duty</div><div class="num na" id="lPwm">&ndash;<span class="unit">/255</span></div></div>
+        <div class="tile"><div class="label">Load</div><div class="num na" id="lTherm">&ndash;<span class="unit">%</span></div></div>
       </div>
     </div>
   </div>
 
   <footer>
     Read-only view. This page cannot command the exoskeleton.
-    &middot; <span id="viewers">1</span> viewer(s)
+    &middot; <span id="viewers">1 viewer</span>
   </footer>
 </div>
 
@@ -188,34 +258,51 @@ const frames = [];
 
 /* ---------- theme ---------------------------------------------------- */
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  $('themeBtn').textContent = t === 'light' ? 'Dark theme' : 'Light theme';
+}
 $('themeBtn').onclick = () => {
-  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
-  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
-  $('themeBtn').textContent = dark ? 'Dark' : 'Light';
-  try { localStorage.setItem('exotel-theme', dark ? 'light' : 'dark'); } catch (e) {}
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  setTheme(next);
+  try { localStorage.setItem('exotel-theme', next); } catch (e) {}
   draw();
 };
-try {
-  const saved = localStorage.getItem('exotel-theme');
-  if (saved) { document.documentElement.setAttribute('data-theme', saved);
-               $('themeBtn').textContent = saved === 'light' ? 'Dark' : 'Light'; }
-} catch (e) {}
+(() => {
+  let saved = null;
+  try { saved = localStorage.getItem('exotel-theme'); } catch (e) {}
+  if (saved === 'light' || saved === 'dark') setTheme(saved);
+})();
 
 $('tableBtn').onclick = () => {
   const on = $('tableCard').classList.toggle('hidden') === false;
   $('charts').classList.toggle('hidden', on);
   $('tableBtn').setAttribute('aria-pressed', String(on));
   $('tableBtn').textContent = on ? 'Chart view' : 'Table view';
-  if (on) renderTable();
+  if (on) renderTable(); else draw();
 };
+
+/* ---------- small helpers --------------------------------------------- */
+// A finite number, or null. Strings, true/false and NaN all count as "no reading".
+const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
+const timeOf = f => new Date((num(f.t) || 0) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+function setNum(id, text, unit, missing) {
+  const el = $(id);
+  el.classList.toggle('na', !!missing);
+  el.textContent = text;
+  if (unit) {
+    const u = document.createElement('span');
+    u.className = 'unit'; u.textContent = unit;
+    el.appendChild(u);
+  }
+}
 
 /* ---------- chart ----------------------------------------------------- */
 /* One measure per chart, one y-axis each. Distance (mm) and duty (0-255)
    are different scales, so they get two plots rather than two axes. */
-function fit(canvas) {
+function fit(canvas, cssH) {
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = parseInt(canvas.getAttribute('height'), 10) / dpr || 180;
-  const cssH = canvas.dataset.cssh ? +canvas.dataset.cssh : (canvas === $('cDist') ? 200 : 140);
+  const w = canvas.clientWidth;
   canvas.style.height = cssH + 'px';
   canvas.width = Math.max(1, Math.round(w * dpr));
   canvas.height = Math.round(cssH * dpr);
@@ -224,41 +311,72 @@ function fit(canvas) {
   return { g, w, h: cssH };
 }
 
-function series(key) { return frames.map(f => (f && f[key] != null ? +f[key] : null)); }
+// Round axis steps (1, 2, 5, 10, 20, 50...) so labels read 100 / 200 / 300, not 98 / 194 / 289.
+function niceStep(span, count) {
+  const raw = span / Math.max(1, count);
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
+}
+
+function series(key) { return frames.map(f => num(f[key])); }
 
 function plot(canvas, specs, opts) {
-  const { g, w, h } = fit(canvas);
-  const padL = 38, padR = 10, padT = 10, padB = 18;
+  const narrow = canvas.clientWidth < 480;
+  const { g, w, h } = fit(canvas, narrow ? opts.heightNarrow : opts.height);
+  const padL = 40, padR = 12, padT = 10, padB = 22;
   g.clearRect(0, 0, w, h);
 
-  let lo = opts.min != null ? opts.min : Infinity;
-  let hi = opts.max != null ? opts.max : -Infinity;
-  if (opts.min == null || opts.max == null) {
-    for (const s of specs) for (const v of s.data) {
-      if (v == null) continue;
-      if (opts.min == null) lo = Math.min(lo, v);
-      if (opts.max == null) hi = Math.max(hi, v);
-    }
+  let lo = Infinity, hi = -Infinity, any = false;
+  for (const s of specs) for (const v of s.data) {
+    if (v == null) continue;
+    any = true; lo = Math.min(lo, v); hi = Math.max(hi, v);
   }
-  if (!isFinite(lo) || !isFinite(hi) || hi - lo < 1e-6) { lo = 0; hi = 1; }
-  // Only pad an end that was computed from the data. An explicit bound is a
-  // real limit of the measure - duty is 0-255, so the axis must not read -25.
-  const span = hi - lo;
-  if (opts.min == null) lo -= span * 0.1;
-  if (opts.max == null) hi += span * 0.1;
-  if (opts.floorZero && lo < 0) lo = 0;
+  let ticks;
+  if (opts.ticks) {
+    // A measure with fixed limits (duty is 0-255): use them, so the axis never reads -25.
+    lo = opts.ticks[0]; hi = opts.ticks[opts.ticks.length - 1]; ticks = opts.ticks;
+  } else {
+    if (!any) { lo = 0; hi = 400; }
+    if (hi - lo < 20) { const c = (hi + lo) / 2; lo = c - 10; hi = c + 10; }
+    const step = niceStep(hi - lo, narrow ? 3 : 4);
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    if (opts.floorZero && lo < 0) lo = 0;
+    ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+  }
 
   const X = i => padL + (w - padL - padR) * (i / Math.max(1, WINDOW - 1));
   const Y = v => padT + (h - padT - padB) * (1 - (v - lo) / (hi - lo));
 
-  // recessive grid + axis labels in text tokens, never a series color
-  g.strokeStyle = css('--border'); g.lineWidth = 1;
-  g.fillStyle = css('--text-muted'); g.font = '10px ui-sans-serif, system-ui, sans-serif';
+  // recessive grid + axis labels in text tokens, never a series colour
+  g.strokeStyle = css('--grid'); g.lineWidth = 1;
+  g.fillStyle = css('--text-muted'); g.font = '11px ui-sans-serif, system-ui, sans-serif';
   g.textAlign = 'right'; g.textBaseline = 'middle';
-  for (let i = 0; i <= 3; i++) {
-    const v = lo + (hi - lo) * i / 3, y = Math.round(Y(v)) + 0.5;
+  for (const v of ticks) {
+    const y = Math.round(Y(v)) + 0.5;
     g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR, y); g.stroke();
-    g.fillText(Math.round(v), padL - 6, y);
+    g.fillText(String(Math.round(v)), padL - 7, y);
+  }
+
+  // time axis: how far back the window reaches, and "now" at the right edge
+  const real = frames.filter(f => num(f.t) != null);
+  g.textBaseline = 'alphabetic';
+  if (real.length > 1) {
+    const span = real[real.length - 1].t - real[0].t;
+    g.textAlign = 'left';
+    g.fillText(span >= 1 ? Math.round(span) + ' s ago' : '', X(WINDOW - frames.length), h - 4);
+    g.textAlign = 'right';
+    g.fillText('now', w - padR, h - 4);
+  }
+
+  if (!any) {
+    // Empty state: say why the chart is blank instead of leaving a bare grid.
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '13px ui-sans-serif, system-ui, sans-serif';
+    g.fillStyle = css('--text-secondary');
+    g.fillText(frames.length ? 'No reading in this window' : 'Waiting for data…',
+               padL + (w - padL - padR) / 2, padT + (h - padT - padB) / 2);
   }
 
   for (const s of specs) {
@@ -268,7 +386,7 @@ function plot(canvas, specs, opts) {
     let pen = false;
     s.data.forEach((v, i) => {
       if (v == null) { pen = false; return; }      // gap, not a drop to zero
-      const x = X(i), y = Y(v);
+      const x = X(i), y = Y(Math.max(lo, Math.min(hi, v)));
       pen ? g.lineTo(x, y) : g.moveTo(x, y);
       pen = true;
     });
@@ -278,7 +396,7 @@ function plot(canvas, specs, opts) {
     let last = -1;
     for (let i = s.data.length - 1; i >= 0; i--) if (s.data[i] != null) { last = i; break; }
     if (last >= 0) {
-      const x = X(last), y = Y(s.data[last]);
+      const x = X(last), y = Y(Math.max(lo, Math.min(hi, s.data[last])));
       g.fillStyle = css('--surface-1');
       g.beginPath(); g.arc(x, y, 4.5, 0, 6.2832); g.fill();   // 2px surface ring
       g.fillStyle = css(s.varName);
@@ -289,16 +407,17 @@ function plot(canvas, specs, opts) {
 }
 
 function draw() {
+  if ($('charts').classList.contains('hidden')) return;
   const pad = new Array(Math.max(0, WINDOW - frames.length)).fill(null);
   const pick = k => pad.concat(series(k)).slice(-WINDOW);
   plot($('cDist'), [
-    { varName: '--series-right', data: pick('rightDistance'), name: 'Right' },
-    { varName: '--series-left',  data: pick('leftDistance'),  name: 'Left'  },
-  ], { floorZero: true });
+    { varName: '--series-right', data: pick('rightDistance') },
+    { varName: '--series-left',  data: pick('leftDistance')  },
+  ], { floorZero: true, height: 220, heightNarrow: 190 });
   plot($('cPwm'), [
-    { varName: '--series-right', data: pick('rightPWM'), name: 'Right' },
-    { varName: '--series-left',  data: pick('leftPWM'),  name: 'Left'  },
-  ], { min: 0, max: 255 });
+    { varName: '--series-right', data: pick('rightPWM') },
+    { varName: '--series-left',  data: pick('leftPWM')  },
+  ], { ticks: [0, 85, 170, 255], height: 150, heightNarrow: 130 });
 }
 
 /* ---------- crosshair + tooltip --------------------------------------- */
@@ -311,15 +430,17 @@ function hover(canvas, tip, keys, unit) {
     let idx = Math.round((x - geom.padL) / span) - (WINDOW - frames.length);
     idx = Math.max(0, Math.min(frames.length - 1, idx));
     const f = frames[idx]; if (!f) return;
-    const fmt = v => (v == null ? 'no target' : Math.round(v) + unit);
+    const fmt = v => (num(v) == null ? 'no reading' : Math.round(v) + unit);
     tip.innerHTML =
+      `<div class="when">${timeOf(f)}</div>` +
       `<div class="tiprow"><i class="swatch" style="background:var(--series-right)"></i>Right <b>${fmt(f[keys[0]])}</b></div>` +
       `<div class="tiprow"><i class="swatch" style="background:var(--series-left)"></i>Left <b>${fmt(f[keys[1]])}</b></div>`;
-    tip.style.left = Math.min(geom.w - 60, Math.max(60, x)) + 'px';
+    tip.style.left = Math.min(geom.w - 70, Math.max(70, x)) + 'px';
     tip.style.top = (geom.padT + 4) + 'px';
     tip.style.opacity = 1;
   };
   canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('touchstart', move, { passive: true });
   canvas.addEventListener('touchmove', move, { passive: true });
   canvas.addEventListener('mouseleave', () => tip.style.opacity = 0);
   canvas.addEventListener('touchend', () => tip.style.opacity = 0);
@@ -332,72 +453,187 @@ function badge(el, cls, text) {
   el.className = 'badge ' + cls;
   el.lastElementChild.textContent = text;     // icon + label, never colour alone
 }
-const n1 = v => (v == null ? '–' : (+v).toFixed(1));
-const n0 = v => (v == null ? '–' : Math.round(v));
+const pct = v => (num(v) == null ? null : Math.round(v * 100));   // 0.12 -> 12
 
 function renderTable() {
+  if (!frames.length) return;
+  const cell = (v, fmt) => (num(v) == null ? '<td class="na">&ndash;</td>' : `<td>${fmt(v)}</td>`);
   const rows = frames.slice(-40).reverse().map(f => {
-    const ts = new Date(f.t * 1000).toLocaleTimeString();
-    const d = v => (v == null ? 'no target' : Math.round(v));
-    return `<tr><td>${ts}</td><td>${d(f.rightDistance)}</td><td>${d(f.leftDistance)}</td>` +
-           `<td>${n0(f.rightPWM)}</td><td>${n0(f.leftPWM)}</td>` +
-           `<td>${f.thermal == null ? '–' : Math.round(f.thermal * 100) + '%'}</td></tr>`;
+    if (f.offline) return `<tr><td>${timeOf(f)}</td><td colspan="6" class="na">exoskeleton unreachable</td></tr>`;
+    return `<tr><td>${timeOf(f)}</td>` +
+      cell(f.rightDistance, Math.round) + cell(f.leftDistance, Math.round) +
+      cell(f.rightPWM, Math.round) + cell(f.leftPWM, Math.round) +
+      cell(f.thermal, v => pct(v) + '%') + cell(f.leftThermal, v => pct(v) + '%') + '</tr>';
   });
   $('tbody').innerHTML = rows.join('');
 }
 
+const SOURCE_NAMES = { live: 'Live from the exoskeleton', demo: 'Demo signal, no hardware', replay: 'Replaying a recording' };
+
 function apply(f) {
+  if (!f || typeof f !== 'object') return;
+  // After a reconnect the stream and the history can overlap: skip repeats.
+  const last = frames[frames.length - 1];
+  if (last && num(f.t) != null && num(last.t) != null && f.t <= last.t) return;
   frames.push(f);
   if (frames.length > WINDOW) frames.splice(0, frames.length - WINDOW);
+  lastFrameAt = Date.now();
+  if (num(f.viewers) != null) $('viewers').textContent = f.viewers + (f.viewers === 1 ? ' viewer' : ' viewers');
 
   if (f.offline) {
-    $('sub').textContent = 'exoskeleton unreachable: ' + (f.error || 'no response');
-    badge($('bSource'), 'critical', 'offline');
+    deviceDown = true;
+    $('sub').textContent = (SOURCE_NAMES[f.source] || 'Source: ' + (f.source || 'unknown')) + ' · ' + timeOf(f);
+    setStatus('critical', 'Exoskeleton unreachable.',
+              'The bridge is running but gets no answer from the device.' + (f.error ? ' (' + f.error + ')' : ''));
+    $('badges').classList.add('stale');
+    draw();
+    if (!$('tableCard').classList.contains('hidden')) renderTable();
     return;
   }
+  deviceDown = false;
 
-  $('sub').textContent = 'live · ' + new Date(f.t * 1000).toLocaleTimeString();
-  $('viewers').textContent = f.viewers != null ? f.viewers : 1;
+  $('sub').textContent = (SOURCE_NAMES[f.source] || 'Source: ' + (f.source || 'unknown')) + ' · ' + timeOf(f);
+  setStatus('good', 'Live.', 'Receiving data' + (f.source === 'demo' ? ' from the built-in demo.' : f.source === 'replay' ? ' from a recording.' : ' from the exoskeleton.'));
+  $('badges').classList.remove('stale');
 
-  badge($('bSource'), f.source === 'live' ? 'good' : '', f.source || 'unknown');
-  badge($('bTarget'), f.tofTarget ? 'good' : 'warning',
+  badge($('bTarget'), f.tofOk === false ? 'critical' : (f.tofTarget ? 'good' : 'warning'),
         f.tofOk === false ? 'sensor fault' : (f.tofTarget ? 'sensor ok' : 'no target'));
   badge($('bMotor'), f.motorEnabled ? 'good' : '', f.motorEnabled ? 'motor on' : 'motor off');
-  const th = Math.max(f.thermal || 0, f.leftThermal || 0);
+  const th = Math.max(num(f.thermal) || 0, num(f.leftThermal) || 0);
   badge($('bThermal'), th >= 0.8 ? 'critical' : th >= 0.6 ? 'warning' : 'good',
         'load ' + Math.round(th * 100) + '%');
 
-  $('rDist').innerHTML = (f.rightDistance == null ? 'no target' : n0(f.rightDistance)) + '<span class="unit">mm</span>';
-  $('lDist').innerHTML = (f.leftDistance == null ? 'no target' : n0(f.leftDistance)) + '<span class="unit">mm</span>';
-  $('rPwm').textContent = n0(f.rightPWM);
-  $('lPwm').textContent = n0(f.leftPWM);
-  $('rTherm').innerHTML = n0((f.thermal || 0) * 100) + '<span class="unit">%</span>';
-  $('lTherm').innerHTML = n0((f.leftThermal || 0) * 100) + '<span class="unit">%</span>';
-
   const gait = f.gait || {};
   const r = gait.right || {}, l = gait.left || {};
-  const best = (r.confident ? r : (l.confident ? l : r));
-  $('cadence').innerHTML = n0(best.cadenceSpm) + '<span class="unit">spm</span>';
-  $('stride').innerHTML  = (best.strideTimeS ? best.strideTimeS.toFixed(2) : '–') + '<span class="unit">s</span>';
-  $('cv').innerHTML      = n1(best.strideCvPct) + '<span class="unit">%</span>';
-  $('asym').innerHTML    = n1(gait.asymmetryPct) + '<span class="unit">%</span>';
-  $('strides').textContent = n0((r.strides || 0) + (l.strides || 0));
+  const dist = v => (num(v) == null ? ['no target', '', true] : [String(Math.round(v)), 'mm', false]);
+  setNum('rDist', ...dist(f.rightDistance));
+  setNum('lDist', ...dist(f.leftDistance));
+  const exc = v => (num(v) ? [String(Math.round(v)), 'mm', false] : ['–', 'mm', true]);
+  setNum('rExc', ...exc(r.excursionMm));
+  setNum('lExc', ...exc(l.excursionMm));
+  const duty = v => (num(v) == null ? ['–', '/255', true] : [String(Math.round(v)), '/255', false]);
+  setNum('rPwm', ...duty(f.rightPWM));
+  setNum('lPwm', ...duty(f.leftPWM));
+  const load = v => (pct(v) == null ? ['–', '%', true] : [String(pct(v)), '%', false]);
+  setNum('rTherm', ...load(f.thermal));
+  setNum('lTherm', ...load(f.leftThermal));
+
+  // Before any stride is found these are 0, which would read as a real value.
+  // Show a dash until there is something to show.
+  const best = (r.confident ? r : (l.confident ? l : (num(r.strideTimeS) ? r : l)));
+  const both = !!(r.confident && l.confident);
+  setNum('cadence', num(best.cadenceSpm) ? String(Math.round(best.cadenceSpm)) : '–', 'steps/min', !num(best.cadenceSpm));
+  setNum('stride', num(best.strideTimeS) ? best.strideTimeS.toFixed(2) : '–', 's', !num(best.strideTimeS));
+  setNum('cv', best.confident && num(best.strideCvPct) != null ? best.strideCvPct.toFixed(1) : '–', '%', !best.confident);
+  setNum('asym', both && num(gait.asymmetryPct) != null ? gait.asymmetryPct.toFixed(1) : '–', '%', !both);
+  setNum('strides', (num(r.strides) || 0) + ' / ' + (num(l.strides) || 0), '', false);
+  $('gaitHint').classList.toggle('hidden', both);
 
   draw();
   if (!$('tableCard').classList.contains('hidden')) renderTable();
 }
 
-/* ---------- transport --------------------------------------------------- */
-fetch('history').then(r => r.json()).then(h => {
-  h.slice(-WINDOW).forEach(f => frames.push(f));
-  if (frames.length) apply(frames.pop());
-}).catch(() => {}).finally(() => {
-  const es = new EventSource('stream');
-  es.onmessage = (e) => { try { apply(JSON.parse(e.data)); } catch (err) {} };
-  es.onerror = () => { $('sub').textContent = 'stream interrupted, reconnecting…'; };
-});
+/* ---------- connection status ------------------------------------------ */
+let lastFrameAt = 0, deviceDown = false, expired = false;
+function setStatus(kind, title, text, showRetry) {
+  $('status').className = 'status ' + kind;
+  $('stTitle').textContent = title;
+  $('stText').textContent = text || '';
+  $('retryBtn').classList.toggle('hidden', !showRetry);
+}
 
-addEventListener('resize', draw);
+/* ---------- transport --------------------------------------------------- */
+let es = null, retryMs = 2000, retryTimer = null, hadError = false;
+
+function loadHistory() {
+  return fetch('history', { cache: 'no-store' }).then(r => {
+    if (r.status === 401) { const e = new Error('expired'); e.expired = true; throw e; }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(h => {
+    if (!Array.isArray(h)) return;
+    frames.length = 0;
+    const keep = h.slice(-WINDOW);
+    keep.slice(0, -1).forEach(f => frames.push(f));
+    if (keep.length) apply(keep[keep.length - 1]); else draw();
+  });
+}
+
+function linkExpired() {
+  expired = true;
+  if (es) { es.close(); es = null; }
+  clearTimeout(retryTimer);
+  setStatus('critical', 'This link no longer works.',
+            'The server was restarted with a new token. Open the new link it printed.');
+  $('badges').classList.add('stale');
+}
+
+function connect() {
+  if (expired) return;
+  if (es) es.close();
+  es = new EventSource('stream');
+  es.onopen = () => {
+    retryMs = 2000;
+    if (hadError) {
+      // Back after a gap: reload the server's history so the chart has no hole
+      // and does not mix in frames from before a restart.
+      hadError = false;
+      loadHistory().catch(e => { if (e.expired) linkExpired(); });
+    }
+    if (!lastFrameAt) setStatus('warning', 'Connected.', 'Waiting for the first sample.');
+  };
+  es.onmessage = (e) => {
+    let f;
+    try { f = JSON.parse(e.data); } catch (err) { return; }
+    apply(f);
+  };
+  es.onerror = () => {
+    hadError = true;
+    $('badges').classList.add('stale');
+    if (es.readyState === EventSource.CLOSED) {
+      // The browser gave up (for example the server answered 401). Check why,
+      // then retry ourselves with a growing delay.
+      es.close(); es = null;
+      scheduleRetry();
+    } else {
+      setStatus('warning', 'Reconnecting…', 'The connection dropped. Trying again.');
+    }
+  };
+}
+
+function scheduleRetry() {
+  if (expired) return;
+  clearTimeout(retryTimer);
+  const secs = Math.round(retryMs / 1000);
+  setStatus('warning', 'Disconnected.', 'Trying again in ' + secs + ' s.', true);
+  retryTimer = setTimeout(retryNow, retryMs);
+  retryMs = Math.min(retryMs * 2, 30000);
+}
+
+function retryNow() {
+  clearTimeout(retryTimer);
+  setStatus('warning', 'Reconnecting…', 'Checking the server.');
+  loadHistory().then(() => { hadError = false; connect(); })
+    .catch(e => { if (e.expired) linkExpired(); else scheduleRetry(); });
+}
+$('retryBtn').onclick = () => { retryMs = 2000; retryNow(); };
+
+// Watchdog: an open connection with no frames (source stopped, device
+// silent) must not keep showing "Live" with the last numbers.
+setInterval(() => {
+  if (expired || !lastFrameAt || !es || es.readyState !== EventSource.OPEN) return;
+  const quiet = (Date.now() - lastFrameAt) / 1000;
+  if (quiet > 4) {
+    setStatus(deviceDown ? 'critical' : 'warning', 'No new data.',
+              'Nothing received for ' + Math.round(quiet) + ' s. The numbers below are the last known values.');
+    $('badges').classList.add('stale');
+  }
+}, 1000);
+
+loadHistory().catch(e => { if (e.expired) linkExpired(); }).finally(connect);
+
+let resizeTimer = null;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(draw, 100); });
 draw();
 </script>
 </body>

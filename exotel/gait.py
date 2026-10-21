@@ -86,7 +86,12 @@ class GaitTracker:
         A dropout is not a zero: feeding 0 mm would fake an enormous swing.
         The sample is simply skipped, exactly as the firmware now skips it.
         """
-        if distance_mm is None or not math.isfinite(distance_mm):
+        # Anything that is not a real number (a string, true/false, NaN from a
+        # glitching board) is treated like a dropout instead of crashing the
+        # tracker or being counted as a reading.
+        if isinstance(distance_mm, bool) or not isinstance(distance_mm, (int, float)):
+            return
+        if not math.isfinite(distance_mm):
             return
 
         self._recent.append((t, distance_mm))

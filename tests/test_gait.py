@@ -54,6 +54,14 @@ class TestGaitTracker(unittest.TestCase):
             gappy.metrics().stride_time_s, clean.metrics().stride_time_s, delta=0.08
         )
 
+    def test_junk_values_are_skipped_not_crashed_on(self):
+        """Strings, booleans and NaN from a bad frame are treated as no reading."""
+        g = GaitTracker()
+        for junk in ("250", True, float("nan"), float("inf"), [1], {}):
+            g.update(0.0, junk)
+        self.assertEqual(g.metrics().strides, 0)
+        self.assertEqual(g.metrics().excursion_mm, 0.0)
+
     def test_excursion_tracks_amplitude(self):
         g = walk(GaitTracker(), period=1.0, seconds=10, amp=60.0)
         self.assertAlmostEqual(g.metrics().excursion_mm, 120.0, delta=12.0)

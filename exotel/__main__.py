@@ -53,7 +53,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--speed", type=float, default=1.0, help="replay speed multiplier")
     p.add_argument("--once", action="store_true", help="play a recording once, don't loop")
     p.add_argument("--seed", type=int, default=None, help="seed the demo generator")
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    # Zero or negative would divide by zero (rate) or freeze replay (speed).
+    if args.rate <= 0:
+        p.error("--rate must be more than 0")
+    if args.speed <= 0:
+        p.error("--speed must be more than 0")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -67,10 +73,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: could not open source {args.source!r}: {exc}", file=sys.stderr)
         return 2
 
+    # Open the recording before starting the server, so a bad path is a
+    # clean error message rather than a traceback with the server half up.
+    recorder = None
+    if args.record:
+        try:
+            recorder = open(args.record, "a", encoding="utf-8")
+        except OSError as exc:
+            print(f"error: could not open {args.record!r} for recording: {exc}", file=sys.stderr)
+            return 2
+
     try:
         httpd = serve(hub, args.host, args.port, token)
     except OSError as exc:
         print(f"error: could not bind {args.host}:{args.port}: {exc}", file=sys.stderr)
+        if recorder:
+            recorder.close()
         return 2
 
     local = f"http://{args.host}:{args.port}/?k={token}"
@@ -91,7 +109,6 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    recorder = open(args.record, "a", encoding="utf-8") if args.record else None
     pump = threading.Thread(
         target=_pump, args=(source, hub, recorder, stop), daemon=True
     )
@@ -104,21 +121,31 @@ def main(argv: list[str] | None = None) -> int:
         stop.set()
         httpd.shutdown()
         if recorder:
-            recorder.close()
+            with _record_lock:
+                recorder.close()
         print(f"\nstopped after {hub.frames} frames "
               f"({time.time() - hub.started:.0f}s)")
     return 0
 
 
+_record_lock = threading.Lock()
+
+
 def _pump(source, hub: Hub, recorder, stop: threading.Event) -> None:
-    for frame in source:
-        if stop.is_set():
-            return
-        hub.publish(frame)
-        if recorder:
-            recorder.write(json.dumps(frame) + "\n")
-            recorder.flush()
-    stop.set()          # a non-looping recording ran out
+    try:
+        for frame in source:
+            if stop.is_set():
+                return
+            hub.publish(frame)
+            if recorder:
+                # The lock stops a write landing on a file main() just closed.
+                with _record_lock:
+                    if not recorder.closed:
+                        recorder.write(json.dumps(frame) + "\n")
+                        recorder.flush()
+    except Exception as exc:     # a source bug must not leave a frozen dashboard
+        print(f"error: source stopped: {type(exc).__name__}: {exc}", file=sys.stderr)
+    stop.set()          # a non-looping recording ran out, or the source failed
 
 
 if __name__ == "__main__":

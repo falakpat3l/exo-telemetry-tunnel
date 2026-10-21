@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import http.server
 import json
+import math
 import queue
 import secrets
 import socketserver
@@ -33,6 +34,23 @@ from .gait import GaitTracker, asymmetry_pct
 
 WEB_DIR = Path(__file__).parent / "web"
 HISTORY = 240                      # samples kept for a late-joining viewer
+
+
+def _clean(value):
+    """Copy a frame with NaN and infinity replaced by None.
+
+    Python's json writes NaN as a bare `NaN`, which is not valid JSON: the
+    browser's JSON.parse rejects it and the dashboard would silently drop the
+    whole frame. None becomes `null`, which every layer already reads as
+    "no reading".
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _clean(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clean(v) for v in value]
+    return value
 
 
 class Hub:
@@ -68,12 +86,14 @@ class Hub:
 
     def publish(self, frame: dict) -> None:
         self.frames += 1
-        t = frame.get("t", time.time())
+        frame = _clean(frame)
+        t = frame.get("t")
+        if isinstance(t, bool) or not isinstance(t, (int, float)):
+            t = frame["t"] = time.time()
         self.right.update(t, frame.get("rightDistance"))
         self.left.update(t, frame.get("leftDistance"))
 
         lm, rm = self.left.metrics(), self.right.metrics()
-        frame = dict(frame)
         frame["gait"] = {
             "left": lm.as_dict(),
             "right": rm.as_dict(),
@@ -183,6 +203,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
         q = self.hub.subscribe()
+        try:
+            # Ask the browser to retry after 2 s if the connection drops
+            # (its default is about 3 s), so a tunnel blip heals quickly.
+            self.wfile.write(b"retry: 2000\n\n")
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            self.hub.unsubscribe(q)
+            return
         try:
             while True:
                 try:

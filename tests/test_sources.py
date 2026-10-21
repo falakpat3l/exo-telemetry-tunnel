@@ -85,6 +85,42 @@ class TestReplaySource(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_missing_file_fails_when_opened_not_later(self):
+        """The CLI catches this before the server starts, so it must raise here."""
+        with self.assertRaises(OSError):
+            ReplaySource("/no/such/recording.jsonl")
+
+    def test_skips_malformed_lines(self):
+        """A recording cut off mid-line (Ctrl-C, full disk) still plays."""
+        fd, path = tempfile.mkstemp(suffix=".jsonl")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(json.dumps({"t": 0.0, "leftDistance": 100}) + "\n")
+                fh.write("not json at all\n")
+                fh.write("[1, 2, 3]\n")
+                fh.write(json.dumps({"t": "soon", "leftDistance": 101}) + "\n")
+                fh.write(json.dumps({"t": 0.02, "leftDistance": 102}) + "\n")
+                fh.write('{"t": 0.03, "leftDist')            # truncated last line
+            src = ReplaySource(path, loop=False, speed=50)
+            frames = list(iter(src))
+            self.assertEqual([f["leftDistance"] for f in frames], [100, 101, 102])
+            self.assertEqual(src.skipped, 3)
+        finally:
+            os.unlink(path)
+
+
+class TestServerFrames(unittest.TestCase):
+    def test_nan_becomes_null_so_the_browser_can_parse_it(self):
+        from exotel.server import Hub
+        hub = Hub()
+        hub.publish({"t": "bad", "rightDistance": float("nan"), "leftDistance": 200.0,
+                     "thermal": float("inf")})
+        frame = hub.history()[-1]
+        self.assertIsNone(frame["rightDistance"])
+        self.assertIsNone(frame["thermal"])
+        self.assertIsInstance(frame["t"], float)
+        json.loads(json.dumps(frame, allow_nan=False))   # strict JSON, no NaN
+
 
 if __name__ == "__main__":
     unittest.main()

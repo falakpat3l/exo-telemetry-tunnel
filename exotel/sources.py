@@ -12,7 +12,9 @@ the numbers came off a real ESP32, out of a recording, or from the simulator.
 from __future__ import annotations
 
 import base64
+import http.client
 import json
+import sys
 import math
 import random
 import time
@@ -182,6 +184,8 @@ class HttpSource:
                 req = urllib.request.Request(self.url, headers=self.headers)
                 with urllib.request.urlopen(req, timeout=self.timeout) as r:
                     payload = json.loads(r.read().decode())
+                if not isinstance(payload, dict):
+                    raise ValueError(f"expected a JSON object, got {type(payload).__name__}")
                 payload["t"] = time.time()
                 payload["source"] = "live"
                 payload.setdefault("tofTarget", payload.get("tofOk", True))
@@ -189,7 +193,10 @@ class HttpSource:
                 if not payload.get("tofTarget", True):
                     payload["rightDistance"] = None
                 yield payload
-            except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            # HTTPException covers a reply cut off half way (IncompleteRead),
+            # which is not an OSError and would otherwise kill the pump thread.
+            except (urllib.error.URLError, http.client.HTTPException, TimeoutError,
+                    ValueError, OSError) as exc:
                 yield {
                     "t": time.time(),
                     "source": "live",
@@ -211,25 +218,52 @@ class ReplaySource:
         self.path = path
         self.loop = loop
         self.speed = max(0.05, speed)
+        self.skipped = 0
+        # Read the file now, not on first iteration, so a missing or empty
+        # recording is reported by the CLI instead of crashing the pump thread
+        # after the server has already started.
+        self._loaded = self._frames()
 
     def _frames(self) -> list[dict]:
         frames = []
-        with open(self.path, "r", encoding="utf-8") as fh:
+        self.skipped = 0
+        with open(self.path, "r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 line = line.strip()
-                if line:
-                    frames.append(json.loads(line))
+                if not line:
+                    continue
+                # A recording cut off by Ctrl-C or a full disk ends in half a
+                # line. Skip anything that is not a whole JSON object rather
+                # than refusing to play the rest of the session.
+                try:
+                    frame = json.loads(line)
+                except ValueError:
+                    self.skipped += 1
+                    continue
+                if not isinstance(frame, dict):
+                    self.skipped += 1
+                    continue
+                if not _is_number(frame.get("t")):
+                    frame.pop("t", None)
+                frames.append(frame)
+        if self.skipped:
+            print(f"warning: skipped {self.skipped} malformed line(s) in {self.path}",
+                  file=sys.stderr)
         if not frames:
             raise ValueError(f"{self.path} contains no frames")
         return frames
 
     def __iter__(self) -> Iterator[dict]:
-        frames = self._frames()
+        frames = self._loaded
         while True:
             wall0 = time.time()
             t0 = frames[0].get("t", 0.0)
+            prev = t0
             for frame in frames:
-                target = wall0 + (frame.get("t", t0) - t0) / self.speed
+                # A frame with no time plays straight after the one before it.
+                ft = frame.get("t", prev)
+                prev = ft
+                target = wall0 + (ft - t0) / self.speed
                 delay = target - time.time()
                 if delay > 0:
                     time.sleep(delay)
@@ -239,6 +273,11 @@ class ReplaySource:
                 yield out
             if not self.loop:
                 return
+
+
+def _is_number(v) -> bool:
+    """True for a real, finite int or float. bool is excluded on purpose."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
 def build_source(args) -> object:
