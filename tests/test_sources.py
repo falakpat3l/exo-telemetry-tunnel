@@ -4,6 +4,7 @@ import itertools
 import json
 import os
 import tempfile
+import time
 import unittest
 
 from exotel.sources import DemoSource, ReplaySource, _assist_duty
@@ -105,6 +106,22 @@ class TestReplaySource(unittest.TestCase):
             frames = list(iter(src))
             self.assertEqual([f["leftDistance"] for f in frames], [100, 101, 102])
             self.assertEqual(src.skipped, 3)
+        finally:
+            os.unlink(path)
+
+    def test_bad_first_time_does_not_stall_playback(self):
+        """Real recordings hold clock times; a first line without one must not mean t0 = 0."""
+        fd, path = tempfile.mkstemp(suffix=".jsonl")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(json.dumps({"t": None, "leftDistance": 100}) + "\n")
+                fh.write(json.dumps({"t": 1760000000.0, "leftDistance": 101}) + "\n")
+                fh.write(json.dumps({"t": 1760000000.02, "leftDistance": 102}) + "\n")
+            src = ReplaySource(path, loop=False, speed=50)
+            started = time.time()
+            frames = list(iter(src))
+            self.assertEqual([f["leftDistance"] for f in frames], [100, 101, 102])
+            self.assertLess(time.time() - started, 2)
         finally:
             os.unlink(path)
 

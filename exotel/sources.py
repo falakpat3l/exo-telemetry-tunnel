@@ -257,7 +257,9 @@ class ReplaySource:
         frames = self._loaded
         while True:
             wall0 = time.time()
-            t0 = frames[0].get("t", 0.0)
+            # Start from the first frame that has a time, so a bad first line
+            # (its time dropped above) can't make the next frame wait for hours.
+            t0 = next((f["t"] for f in frames if "t" in f), 0.0)
             prev = t0
             for frame in frames:
                 # A frame with no time plays straight after the one before it.

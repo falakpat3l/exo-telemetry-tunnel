@@ -6,6 +6,8 @@
 - Replay skips broken lines (for example a recording cut off by Ctrl-C)
   instead of refusing to play, and a missing or empty recording is reported
   before the server starts.
+- A replay whose first line has no valid time no longer waits for hours
+  before the second frame.
 - A reply from the device that is cut short, or is not a JSON object, no
   longer stops the data feed for good.
 - Strings, true/false and NaN in a distance are treated as no reading
