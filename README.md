@@ -4,6 +4,8 @@
 
 A read-only telemetry bridge for the [StrideMate walking-assist exoskeleton](https://github.com/falakpat3l/stridemate-exoskeleton). It takes the exoskeleton's live data, derives gait metrics from it, serves a dashboard, and, with one command, puts that dashboard on a public HTTPS URL so a supervisor, a clinician or an interviewer can watch a session from anywhere.
 
+> **Status: complete (October 2026).** Part of the StrideMate M.Tech project at IIT Hyderabad, which has finished. The code works and its tests pass; it is on hold, with no further changes planned.
+
 **It runs with no hardware.** `python -m exotel --demo` synthesises a plausible gait signal, dropouts and all, so you can clone this and see the whole thing working in about ten seconds.
 
 ![The dashboard](docs/dashboard.png)

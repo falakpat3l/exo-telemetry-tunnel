@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.0] - 2026-10-25
+
+Final release. The StrideMate M.Tech project has finished; this version is complete and on hold.
 
 ### Fixed
 - Replay skips broken lines (for example a recording cut off by Ctrl-C)
