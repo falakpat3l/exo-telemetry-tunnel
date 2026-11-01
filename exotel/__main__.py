@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sys
 import threading
@@ -49,7 +50,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--record", metavar="FILE",
                    help="append every frame to FILE as JSON lines")
     p.add_argument("--user", help="dashboard username on the exoskeleton")
-    p.add_argument("--password", help="dashboard password on the exoskeleton")
+    p.add_argument("--password", default=os.environ.get("EXOTEL_PASSWORD"),
+                   help="dashboard password on the exoskeleton (or set EXOTEL_PASSWORD, "
+                        "which keeps it out of your shell history)")
     p.add_argument("--speed", type=float, default=1.0, help="replay speed multiplier")
     p.add_argument("--once", action="store_true", help="play a recording once, don't loop")
     p.add_argument("--seed", type=int, default=None, help="seed the demo generator")

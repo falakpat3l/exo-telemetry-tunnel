@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.1] - 2026-11-01
+
+Security patch. The project stays complete and on hold.
+
+### Security
+- A client that connects and sends nothing is dropped after 30 seconds, so idle
+  connections can no longer use up the server's threads.
+- At most 32 viewers can stream at once; extra ones get a short "try again"
+  reply instead of slowing everyone down.
+- The access cookie is now HttpOnly, and Secure when opened through the https
+  tunnel.
+- The dashboard page sends a strict Content-Security-Policy and refuses to be
+  shown inside another site's frame.
+- The token is removed from the address bar once the page has loaded, so it no
+  longer shows in screenshots, screen shares or copied links.
+- The exoskeleton password can come from the EXOTEL_PASSWORD environment
+  variable, which keeps it out of your shell history.
+
 ## [1.1.0] - 2026-10-25
 
 Final release. The StrideMate M.Tech project has finished; this version is complete and on hold.

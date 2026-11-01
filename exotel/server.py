@@ -34,6 +34,11 @@ from .gait import GaitTracker, asymmetry_pct
 
 WEB_DIR = Path(__file__).parent / "web"
 HISTORY = 240                      # samples kept for a late-joining viewer
+MAX_VIEWERS = 32                   # one thread per viewer; a cap stops a link-holder exhausting them
+
+# The page has no outside resources, so it can be locked to its own origin.
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+       "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 
 
 def _clean(value):
@@ -126,6 +131,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     token: str = ""
     server_version = "exotel"
     sys_version = ""
+    # A client that connects and then sends nothing would otherwise hold a
+    # thread forever. Viewers are unaffected: the stream writes at least every 15 s.
+    timeout = 30
 
     def log_message(self, fmt: str, *args) -> None:
         pass                    # the CLI prints what matters; this is noise
@@ -179,8 +187,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             page = (WEB_DIR / "index.html").read_bytes()
             # Remember the token so in-page fetches don't need it in every URL,
             # and so a shared link works after the query string is stripped.
-            cookie = f"exotel={self.token}; Path=/; SameSite=Strict; Max-Age=86400"
-            self._send(200, page, "text/html; charset=utf-8", {"Set-Cookie": cookie})
+            # HttpOnly: page scripts never need it. Secure when the request came
+            # in over https (the Cloudflare tunnel says so in X-Forwarded-Proto).
+            cookie = f"exotel={self.token}; Path=/; SameSite=Strict; Max-Age=86400; HttpOnly"
+            if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+                cookie += "; Secure"
+            self._send(200, page, "text/html; charset=utf-8", {
+                "Set-Cookie": cookie,
+                "Content-Security-Policy": CSP,
+                "X-Frame-Options": "DENY",
+            })
             return
 
         if parsed.path == "/history":
@@ -189,6 +205,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/stream":
+            if self.hub.viewers >= MAX_VIEWERS:
+                self._send(503, b"too many viewers, try again later\n", "text/plain", {"Retry-After": "10"})
+                return
             self._stream()
             return
 

@@ -635,6 +635,12 @@ loadHistory().catch(e => { if (e.expired) linkExpired(); }).finally(connect);
 let resizeTimer = null;
 addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(draw, 100); });
 draw();
+
+/* The token is now in an HttpOnly cookie, so take it out of the address bar:
+   it no longer shows in screenshots, screen shares or a copied link. */
+try {
+  if (location.search.indexOf('k=') !== -1) history.replaceState(null, '', location.pathname);
+} catch (e) {}
 </script>
 </body>
 </html>

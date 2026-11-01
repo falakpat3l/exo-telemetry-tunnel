@@ -33,10 +33,12 @@ That starts the dashboard and a [Cloudflare quick tunnel](https://try.cloudflare
 ## Against the real device
 
 ```bash
+export EXOTEL_PASSWORD='your dashboard password'   # kept out of shell history
 python -m exotel --source http://10.210.60.121 \
-                 --user stridemate --password <dashboard password> \
-                 --record session.jsonl
+                 --user stridemate --record session.jsonl
 ```
+
+`--password` still works too, but the environment variable is safer.
 
 It polls the right leg's `/data` endpoint, the one that already carries both legs. `--record` writes every frame as JSON lines, which you can play back later:
 
