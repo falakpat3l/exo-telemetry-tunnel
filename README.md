@@ -20,7 +20,7 @@ cd exo-telemetry-tunnel
 python3 -m exotel --demo
 ```
 
-Open the URL it prints. No dependencies: Python 3.10+ and the standard library, nothing else. The exoskeleton's own firmware avoids external libraries on principle, and this follows the same rule.
+Open the URL it prints. No dependencies: Python 3.11+ and the standard library, nothing else. The exoskeleton's own firmware avoids external libraries on principle, and this follows the same rule.
 
 To share it:
 
