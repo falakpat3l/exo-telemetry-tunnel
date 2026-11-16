@@ -122,3 +122,7 @@ separate licence from the copyright holder.
 Not an OSI-approved open-source licence, because no OSI-approved licence
 restricts commercial use. The exoskeleton firmware it pairs with is under the
 same terms; the mechanical CAD is under CC BY-NC-SA 4.0.
+
+## How this was built
+
+I specified what this should do, tested it and released it. AI coding assistants wrote most of the code.
